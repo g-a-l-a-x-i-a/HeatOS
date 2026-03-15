@@ -7,6 +7,15 @@ HISTORY_COUNT equ 8
 HISTORY_ENTRY_SIZE equ INPUT_MAX + 1
 DAY_TICKS_HI equ 0x0018
 DAY_TICKS_LO equ 0x00B0
+VIDEO_SEGMENT equ 0xB800
+DESKTOP_APP_COUNT equ 6
+
+APP_TERMINAL equ 0
+APP_SYSTEM equ 1
+APP_FILES equ 2
+APP_NOTES equ 3
+APP_CLOCK equ 4
+APP_POWER equ 5
 
 start:
     cli
@@ -22,14 +31,963 @@ start:
 
     mov [boot_drive], dl
     mov [kernel_sectors], cl
+    mov byte [desktop_selection], APP_TERMINAL
 
     call capture_boot_ticks
+    jmp desktop_main
+
+desktop_main:
+    call set_text_mode
+
+.desktop_loop:
+    call render_desktop_home
+    call wait_key
+
+    cmp ah, 0x48
+    je .move_up
+    cmp ah, 0x50
+    je .move_down
+    cmp ah, 0x3B
+    je .show_help
+
+    cmp al, 13
+    je .open_selected
+    cmp al, 27
+    je .open_power
+
+    cmp al, '1'
+    je .shortcut_terminal
+    cmp al, '2'
+    je .shortcut_system
+    cmp al, '3'
+    je .shortcut_files
+    cmp al, '4'
+    je .shortcut_notes
+    cmp al, '5'
+    je .shortcut_clock
+    cmp al, '6'
+    je .shortcut_power
+
+    cmp al, 't'
+    je .shortcut_terminal
+    cmp al, 'T'
+    je .shortcut_terminal
+    cmp al, 's'
+    je .shortcut_system
+    cmp al, 'S'
+    je .shortcut_system
+    cmp al, 'f'
+    je .shortcut_files
+    cmp al, 'F'
+    je .shortcut_files
+    cmp al, 'n'
+    je .shortcut_notes
+    cmp al, 'N'
+    je .shortcut_notes
+    cmp al, 'c'
+    je .shortcut_clock
+    cmp al, 'C'
+    je .shortcut_clock
+    cmp al, 'p'
+    je .shortcut_power
+    cmp al, 'P'
+    je .shortcut_power
+
+    jmp .desktop_loop
+
+.move_up:
+    cmp byte [desktop_selection], APP_TERMINAL
+    jne .dec_selection
+    mov byte [desktop_selection], DESKTOP_APP_COUNT - 1
+    jmp .desktop_loop
+
+.dec_selection:
+    dec byte [desktop_selection]
+    jmp .desktop_loop
+
+.move_down:
+    cmp byte [desktop_selection], DESKTOP_APP_COUNT - 1
+    jne .inc_selection
+    mov byte [desktop_selection], APP_TERMINAL
+    jmp .desktop_loop
+
+.inc_selection:
+    inc byte [desktop_selection]
+    jmp .desktop_loop
+
+.show_help:
+    call desktop_help_app
+    jmp .desktop_loop
+
+.open_selected:
+    call open_desktop_app
+    jmp .desktop_loop
+
+.open_power:
+    mov byte [desktop_selection], APP_POWER
+    call power_app
+    jmp .desktop_loop
+
+.shortcut_terminal:
+    mov byte [desktop_selection], APP_TERMINAL
+    call terminal_session
+    jmp .desktop_loop
+
+.shortcut_system:
+    mov byte [desktop_selection], APP_SYSTEM
+    call system_app
+    jmp .desktop_loop
+
+.shortcut_files:
+    mov byte [desktop_selection], APP_FILES
+    call files_app
+    jmp .desktop_loop
+
+.shortcut_notes:
+    mov byte [desktop_selection], APP_NOTES
+    call notes_app
+    jmp .desktop_loop
+
+.shortcut_clock:
+    mov byte [desktop_selection], APP_CLOCK
+    call clock_app
+    jmp .desktop_loop
+
+.shortcut_power:
+    mov byte [desktop_selection], APP_POWER
+    call power_app
+    jmp .desktop_loop
+
+open_desktop_app:
+    cmp byte [desktop_selection], APP_TERMINAL
+    je .open_terminal
+    cmp byte [desktop_selection], APP_SYSTEM
+    je .open_system
+    cmp byte [desktop_selection], APP_FILES
+    je .open_files
+    cmp byte [desktop_selection], APP_NOTES
+    je .open_notes
+    cmp byte [desktop_selection], APP_CLOCK
+    je .open_clock
+    jmp power_app
+
+.open_terminal:
+    call terminal_session
+    ret
+
+.open_system:
+    call system_app
+    ret
+
+.open_files:
+    call files_app
+    ret
+
+.open_notes:
+    call notes_app
+    ret
+
+.open_clock:
+    call clock_app
+    ret
+
+desktop_help_app:
+.loop:
+    call render_help_app
+    call wait_key
+    cmp al, 27
+    je .done
+    cmp al, 13
+    je .done
+    cmp al, 't'
+    je .terminal
+    cmp al, 'T'
+    je .terminal
+    jmp .loop
+
+.terminal:
+    call terminal_session
+.done:
+    ret
+
+system_app:
+.loop:
+    call render_system_app
+    call wait_key
+    cmp al, 27
+    je .done
+    cmp al, 13
+    je .done
+    cmp al, 'r'
+    je .loop
+    cmp al, 'R'
+    je .loop
+    cmp al, 't'
+    je .terminal
+    cmp al, 'T'
+    je .terminal
+    jmp .loop
+
+.terminal:
+    call terminal_session
+.done:
+    ret
+
+files_app:
+.loop:
+    call render_files_app
+    call wait_key
+    cmp al, 27
+    je .done
+    cmp al, 13
+    je .done
+    cmp al, 't'
+    je .terminal
+    cmp al, 'T'
+    je .terminal
+    jmp .loop
+
+.terminal:
+    call terminal_session
+.done:
+    ret
+
+notes_app:
+.loop:
+    call render_notes_app
+    call wait_key
+    cmp al, 27
+    je .done
+    cmp al, 13
+    je .done
+    cmp al, 't'
+    je .terminal
+    cmp al, 'T'
+    je .terminal
+    jmp .loop
+
+.terminal:
+    call terminal_session
+.done:
+    ret
+
+clock_app:
+.loop:
+    call render_clock_app
+    call wait_key
+    cmp al, 27
+    je .done
+    cmp al, 13
+    je .done
+    cmp al, 'r'
+    je .loop
+    cmp al, 'R'
+    je .loop
+    cmp al, 't'
+    je .terminal
+    cmp al, 'T'
+    je .terminal
+    jmp .loop
+
+.terminal:
+    call terminal_session
+.done:
+    ret
+
+power_app:
+.loop:
+    call render_power_app
+    call wait_key
+    cmp al, 27
+    je .done
+    cmp al, 13
+    je .done
+    cmp al, 'd'
+    je .done
+    cmp al, 'D'
+    je .done
+    cmp al, 'h'
+    je do_halt
+    cmp al, 'H'
+    je do_halt
+    cmp al, 'r'
+    je do_reboot
+    cmp al, 'R'
+    je do_reboot
+    cmp al, 't'
+    je .terminal
+    cmp al, 'T'
+    je .terminal
+    jmp .loop
+
+.terminal:
+    call terminal_session
+.done:
+    ret
+
+render_desktop_home:
+    call build_desktop_stats
+
+    mov dh, 0
+    mov dl, 0
+    mov ch, 25
+    mov cl, 80
+    mov bl, 0x1F
+    mov al, ' '
+    call fill_rect
+
+    mov dh, 0
+    mov dl, 0
+    mov ch, 1
+    mov cl, 80
+    mov bl, 0x70
+    mov al, ' '
+    call fill_rect
+
+    mov dh, 2
+    mov dl, 2
+    mov ch, 20
+    mov cl, 20
+    mov bl, 0x17
+    mov al, ' '
+    call fill_rect
+
+    mov dh, 2
+    mov dl, 24
+    mov ch, 20
+    mov cl, 54
+    mov bl, 0x1F
+    mov al, ' '
+    call fill_rect
+
+    mov dh, 23
+    mov dl, 0
+    mov ch, 2
+    mov cl, 80
+    mov bl, 0x70
+    mov al, ' '
+    call fill_rect
+
+    mov dh, 0
+    mov dl, 2
+    mov bl, 0x70
+    mov si, desktop_top_title_msg
+    call write_string_at
+
+    mov dh, 0
+    mov dl, 46
+    mov bl, 0x70
+    mov si, date_buffer
+    call write_string_at
+
+    mov dh, 0
+    mov dl, 60
+    mov bl, 0x70
+    mov si, time_buffer
+    call write_string_at
+
+    mov dh, 3
+    mov dl, 5
+    mov bl, 0x1E
+    mov si, desktop_apps_header_msg
+    call write_string_at
+
+    mov al, APP_TERMINAL
+    mov dh, 5
+    mov si, desktop_app_terminal_msg
+    call render_app_entry
+
+    mov al, APP_SYSTEM
+    mov dh, 7
+    mov si, desktop_app_system_msg
+    call render_app_entry
+
+    mov al, APP_FILES
+    mov dh, 9
+    mov si, desktop_app_files_msg
+    call render_app_entry
+
+    mov al, APP_NOTES
+    mov dh, 11
+    mov si, desktop_app_notes_msg
+    call render_app_entry
+
+    mov al, APP_CLOCK
+    mov dh, 13
+    mov si, desktop_app_clock_msg
+    call render_app_entry
+
+    mov al, APP_POWER
+    mov dh, 15
+    mov si, desktop_app_power_msg
+    call render_app_entry
+
+    mov dh, 4
+    mov dl, 27
+    mov bl, 0x1F
+    mov si, desktop_workspace_header_msg
+    call write_string_at
+
+    call render_desktop_preview
+
+    mov dh, 23
+    mov dl, 2
+    mov bl, 0x70
+    mov si, desktop_footer_line1_msg
+    call write_string_at
+
+    mov dh, 24
+    mov dl, 2
+    mov bl, 0x70
+    mov si, desktop_footer_line2_msg
+    call write_string_at
+    ret
+
+render_app_entry:
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+
+    mov bl, 0x17
+    cmp al, [desktop_selection]
+    jne .draw
+    mov bl, 0x70
+
+.draw:
+    mov dl, 4
+    mov ch, 1
+    mov cl, 16
+    mov al, ' '
+    call fill_rect
+
+    mov dl, 6
+    call write_string_at
+
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+render_desktop_preview:
+    cmp byte [desktop_selection], APP_TERMINAL
+    je .terminal
+    cmp byte [desktop_selection], APP_SYSTEM
+    je .system
+    cmp byte [desktop_selection], APP_FILES
+    je .files
+    cmp byte [desktop_selection], APP_NOTES
+    je .notes
+    cmp byte [desktop_selection], APP_CLOCK
+    je .clock
+    jmp .power
+
+.terminal:
+    mov dh, 6
+    mov dl, 27
+    mov bl, 0x1F
+    mov si, preview_terminal_title_msg
+    call write_string_at
+    mov dh, 8
+    mov si, preview_terminal_line1_msg
+    call write_string_at
+    mov dh, 9
+    mov si, preview_terminal_line2_msg
+    call write_string_at
+    mov dh, 10
+    mov si, preview_terminal_line3_msg
+    call write_string_at
+    jmp .common
+
+.system:
+    mov dh, 6
+    mov dl, 27
+    mov bl, 0x1F
+    mov si, preview_system_title_msg
+    call write_string_at
+    mov dh, 8
+    mov si, preview_system_line1_msg
+    call write_string_at
+    mov dh, 9
+    mov si, preview_system_line2_msg
+    call write_string_at
+    mov dh, 10
+    mov si, preview_system_line3_msg
+    call write_string_at
+    jmp .common
+
+.files:
+    mov dh, 6
+    mov dl, 27
+    mov bl, 0x1F
+    mov si, preview_files_title_msg
+    call write_string_at
+    mov dh, 8
+    mov si, preview_files_line1_msg
+    call write_string_at
+    mov dh, 9
+    mov si, preview_files_line2_msg
+    call write_string_at
+    mov dh, 10
+    mov si, preview_files_line3_msg
+    call write_string_at
+    jmp .common
+
+.notes:
+    mov dh, 6
+    mov dl, 27
+    mov bl, 0x1F
+    mov si, preview_notes_title_msg
+    call write_string_at
+    mov dh, 8
+    mov si, preview_notes_line1_msg
+    call write_string_at
+    mov dh, 9
+    mov si, preview_notes_line2_msg
+    call write_string_at
+    mov dh, 10
+    mov si, preview_notes_line3_msg
+    call write_string_at
+    jmp .common
+
+.clock:
+    mov dh, 6
+    mov dl, 27
+    mov bl, 0x1F
+    mov si, preview_clock_title_msg
+    call write_string_at
+    mov dh, 8
+    mov si, preview_clock_line1_msg
+    call write_string_at
+    mov dh, 9
+    mov si, preview_clock_line2_msg
+    call write_string_at
+    mov dh, 10
+    mov si, preview_clock_line3_msg
+    call write_string_at
+    jmp .common
+
+.power:
+    mov dh, 6
+    mov dl, 27
+    mov bl, 0x1F
+    mov si, preview_power_title_msg
+    call write_string_at
+    mov dh, 8
+    mov si, preview_power_line1_msg
+    call write_string_at
+    mov dh, 9
+    mov si, preview_power_line2_msg
+    call write_string_at
+    mov dh, 10
+    mov si, preview_power_line3_msg
+    call write_string_at
+
+.common:
+    mov dh, 13
+    mov dl, 27
+    mov bl, 0x1E
+    mov si, desktop_quick_header_msg
+    call write_string_at
+
+    mov dh, 15
+    mov dl, 27
+    mov bl, 0x1F
+    mov si, desktop_memory_label_msg
+    call write_string_at
+    mov dl, 48
+    mov si, memory_buffer
+    call write_string_at
+    mov dl, 54
+    mov si, desktop_kb_msg
+    call write_string_at
+
+    mov dh, 16
+    mov dl, 27
+    mov si, desktop_kernel_label_msg
+    call write_string_at
+    mov dl, 48
+    mov si, kernel_sector_buffer
+    call write_string_at
+
+    mov dh, 17
+    mov dl, 27
+    mov si, desktop_boot_label_msg
+    call write_string_at
+    mov dl, 48
+    mov si, boot_drive_buffer
+    call write_string_at
+
+    mov dh, 18
+    mov dl, 27
+    mov si, desktop_clock_label_msg
+    call write_string_at
+    mov dl, 48
+    mov si, date_buffer
+    call write_string_at
+    mov dl, 60
+    mov si, time_buffer
+    call write_string_at
+
+    mov dh, 20
+    mov dl, 27
+    mov si, desktop_launch_hint_msg
+    call write_string_at
+    ret
+
+render_system_app:
+    call build_desktop_stats
+    mov si, app_system_title_msg
+    call render_standard_app_layout
+
+    mov dh, 4
+    mov dl, 8
+    mov bl, 0x17
+    mov si, system_heading_msg
+    call write_string_at
+
+    mov dh, 6
+    mov si, system_version_label_msg
+    call write_string_at
+    mov dl, 28
+    mov si, version_name_msg
+    call write_string_at
+
+    mov dh, 7
+    mov dl, 8
+    mov si, system_boot_label_msg
+    call write_string_at
+    mov dl, 28
+    mov si, boot_drive_buffer
+    call write_string_at
+
+    mov dh, 8
+    mov dl, 8
+    mov si, system_kernel_label_msg
+    call write_string_at
+    mov dl, 28
+    mov si, kernel_sector_buffer
+    call write_string_at
+
+    mov dh, 9
+    mov dl, 8
+    mov si, system_memory_label_msg
+    call write_string_at
+    mov dl, 28
+    mov si, memory_buffer
+    call write_string_at
+    mov dl, 34
+    mov si, desktop_kb_msg
+    call write_string_at
+
+    mov dh, 10
+    mov dl, 8
+    mov si, system_date_label_msg
+    call write_string_at
+    mov dl, 28
+    mov si, date_buffer
+    call write_string_at
+
+    mov dh, 11
+    mov dl, 8
+    mov si, system_time_label_msg
+    call write_string_at
+    mov dl, 28
+    mov si, time_buffer
+    call write_string_at
+
+    mov dh, 12
+    mov dl, 8
+    mov si, system_uptime_label_msg
+    call write_string_at
+    mov dl, 28
+    mov si, uptime_buffer
+    call write_string_at
+    mov dl, 40
+    mov si, seconds_suffix_inline_msg
+    call write_string_at
+
+    mov dh, 14
+    mov dl, 8
+    mov si, system_note_line1_msg
+    call write_string_at
+    mov dh, 15
+    mov si, system_note_line2_msg
+    call write_string_at
+    mov dh, 16
+    mov si, system_note_line3_msg
+    call write_string_at
+    ret
+
+render_files_app:
+    mov si, app_files_title_msg
+    call render_standard_app_layout
+
+    mov dh, 4
+    mov dl, 8
+    mov bl, 0x17
+    mov si, files_heading_msg
+    call write_string_at
+    mov dh, 6
+    mov si, files_line1_msg
+    call write_string_at
+    mov dh, 7
+    mov si, files_line2_msg
+    call write_string_at
+    mov dh, 8
+    mov si, files_line3_msg
+    call write_string_at
+    mov dh, 9
+    mov si, files_line4_msg
+    call write_string_at
+    mov dh, 10
+    mov si, files_line5_msg
+    call write_string_at
+    mov dh, 12
+    mov si, files_note_line1_msg
+    call write_string_at
+    mov dh, 13
+    mov si, files_note_line2_msg
+    call write_string_at
+    mov dh, 14
+    mov si, files_note_line3_msg
+    call write_string_at
+    ret
+
+render_notes_app:
+    mov si, app_notes_title_msg
+    call render_standard_app_layout
+
+    mov dh, 4
+    mov dl, 8
+    mov bl, 0x17
+    mov si, notes_heading_msg
+    call write_string_at
+    mov dh, 6
+    mov si, notes_line1_msg
+    call write_string_at
+    mov dh, 7
+    mov si, notes_line2_msg
+    call write_string_at
+    mov dh, 8
+    mov si, notes_line3_msg
+    call write_string_at
+    mov dh, 9
+    mov si, notes_line4_msg
+    call write_string_at
+    mov dh, 10
+    mov si, notes_line5_msg
+    call write_string_at
+    mov dh, 12
+    mov si, notes_footer_line1_msg
+    call write_string_at
+    mov dh, 13
+    mov si, notes_footer_line2_msg
+    call write_string_at
+    ret
+
+render_clock_app:
+    call build_desktop_stats
+    mov si, app_clock_title_msg
+    call render_standard_app_layout
+
+    mov dh, 4
+    mov dl, 8
+    mov bl, 0x17
+    mov si, clock_heading_msg
+    call write_string_at
+
+    mov dh, 7
+    mov dl, 8
+    mov si, clock_date_label_msg
+    call write_string_at
+    mov dl, 24
+    mov si, date_buffer
+    call write_string_at
+
+    mov dh, 9
+    mov dl, 8
+    mov si, clock_time_label_msg
+    call write_string_at
+    mov dl, 24
+    mov si, time_buffer
+    call write_string_at
+
+    mov dh, 11
+    mov dl, 8
+    mov si, clock_uptime_label_msg
+    call write_string_at
+    mov dl, 24
+    mov si, uptime_buffer
+    call write_string_at
+    mov dl, 36
+    mov si, seconds_suffix_inline_msg
+    call write_string_at
+
+    mov dh, 14
+    mov dl, 8
+    mov si, clock_note_line1_msg
+    call write_string_at
+    mov dh, 15
+    mov si, clock_note_line2_msg
+    call write_string_at
+    ret
+
+render_power_app:
+    mov dh, 0
+    mov dl, 0
+    mov ch, 25
+    mov cl, 80
+    mov bl, 0x4F
+    mov al, ' '
+    call fill_rect
+
+    mov dh, 0
+    mov dl, 0
+    mov ch, 1
+    mov cl, 80
+    mov bl, 0x70
+    mov al, ' '
+    call fill_rect
+
+    mov dh, 5
+    mov dl, 14
+    mov ch, 13
+    mov cl, 52
+    mov bl, 0x4F
+    mov al, ' '
+    call fill_rect
+
+    mov dh, 0
+    mov dl, 2
+    mov bl, 0x70
+    mov si, app_power_title_msg
+    call write_string_at
+
+    mov dh, 7
+    mov dl, 20
+    mov bl, 0x4F
+    mov si, power_heading_msg
+    call write_string_at
+    mov dh, 10
+    mov si, power_line1_msg
+    call write_string_at
+    mov dh, 11
+    mov si, power_line2_msg
+    call write_string_at
+    mov dh, 12
+    mov si, power_line3_msg
+    call write_string_at
+    mov dh, 13
+    mov si, power_line4_msg
+    call write_string_at
+    mov dh, 16
+    mov si, power_line5_msg
+    call write_string_at
+    mov dh, 17
+    mov si, power_line6_msg
+    call write_string_at
+    ret
+
+render_help_app:
+    mov si, app_help_title_msg
+    call render_standard_app_layout
+
+    mov dh, 4
+    mov dl, 8
+    mov bl, 0x17
+    mov si, help_heading_msg
+    call write_string_at
+    mov dh, 6
+    mov si, help_line1_msg
+    call write_string_at
+    mov dh, 7
+    mov si, help_line2_msg
+    call write_string_at
+    mov dh, 8
+    mov si, help_line3_msg
+    call write_string_at
+    mov dh, 9
+    mov si, help_line4_msg
+    call write_string_at
+    mov dh, 10
+    mov si, help_line5_msg
+    call write_string_at
+    mov dh, 12
+    mov si, help_line6_msg
+    call write_string_at
+    mov dh, 13
+    mov si, help_line7_msg
+    call write_string_at
+    mov dh, 14
+    mov si, help_line8_msg
+    call write_string_at
+    ret
+
+render_standard_app_layout:
+    push si
+
+    mov dh, 0
+    mov dl, 0
+    mov ch, 25
+    mov cl, 80
+    mov bl, 0x1F
+    mov al, ' '
+    call fill_rect
+
+    mov dh, 0
+    mov dl, 0
+    mov ch, 1
+    mov cl, 80
+    mov bl, 0x70
+    mov al, ' '
+    call fill_rect
+
+    mov dh, 2
+    mov dl, 4
+    mov ch, 20
+    mov cl, 72
+    mov bl, 0x17
+    mov al, ' '
+    call fill_rect
+
+    mov dh, 23
+    mov dl, 0
+    mov ch, 2
+    mov cl, 80
+    mov bl, 0x70
+    mov al, ' '
+    call fill_rect
+
+    pop si
+    mov dh, 0
+    mov dl, 2
+    mov bl, 0x70
+    call write_string_at
+
+    mov dh, 23
+    mov dl, 2
+    mov bl, 0x70
+    mov si, app_footer_line1_msg
+    call write_string_at
+
+    mov dh, 24
+    mov dl, 2
+    mov bl, 0x70
+    mov si, app_footer_line2_msg
+    call write_string_at
+    ret
+
+terminal_session:
     call clear_screen
     call print_banner
-    mov si, boot_ready_msg
+    mov si, terminal_ready_msg
     call print_string
     call print_boot_summary_line
-    mov si, help_hint_msg
+    mov si, terminal_hint_msg
     call print_string
 
 shell_loop:
@@ -162,6 +1120,24 @@ dispatch_command:
     call string_equals
     cmp al, 1
     je do_repeat
+
+    mov si, command_buffer
+    mov di, cmd_apps
+    call string_equals
+    cmp al, 1
+    je show_apps
+
+    mov si, command_buffer
+    mov di, cmd_desktop
+    call string_equals
+    cmp al, 1
+    je leave_to_desktop
+
+    mov si, command_buffer
+    mov di, cmd_gui
+    call string_equals
+    cmp al, 1
+    je leave_to_desktop
 
     mov si, command_buffer
     mov di, cmd_halt
@@ -434,6 +1410,16 @@ do_repeat:
     call parse_command
     jmp dispatch_command
 
+show_apps:
+    mov si, apps_msg
+    call print_string
+    jmp shell_loop
+
+leave_to_desktop:
+    mov si, returning_to_desktop_msg
+    call print_string
+    ret
+
 do_halt:
     mov si, halt_msg
     call print_string
@@ -459,6 +1445,387 @@ capture_boot_ticks:
     popa
     ret
 
+build_desktop_stats:
+    call build_date_string
+    call build_time_string
+    call build_memory_string
+    call build_kernel_sectors_string
+    call build_boot_drive_string
+    call build_uptime_string
+    ret
+
+build_date_string:
+    push ax
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+    pop es
+
+    mov ah, 0x04
+    int 0x1A
+    jc .fallback
+
+    mov di, date_buffer
+    mov al, ch
+    call store_bcd_ascii
+    mov al, cl
+    call store_bcd_ascii
+    mov al, '-'
+    stosb
+    mov al, dh
+    call store_bcd_ascii
+    mov al, '-'
+    stosb
+    mov al, dl
+    call store_bcd_ascii
+    xor al, al
+    stosb
+    jmp .done
+
+.fallback:
+    mov si, unavailable_msg
+    mov di, date_buffer
+    call copy_zero_string
+
+.done:
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop ax
+    ret
+
+build_time_string:
+    push ax
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+    pop es
+
+    mov ah, 0x02
+    int 0x1A
+    jc .fallback
+
+    mov di, time_buffer
+    mov al, ch
+    call store_bcd_ascii
+    mov al, ':'
+    stosb
+    mov al, cl
+    call store_bcd_ascii
+    mov al, ':'
+    stosb
+    mov al, dh
+    call store_bcd_ascii
+    xor al, al
+    stosb
+    jmp .done
+
+.fallback:
+    mov si, unavailable_msg
+    mov di, time_buffer
+    call copy_zero_string
+
+.done:
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop ax
+    ret
+
+build_memory_string:
+    push ax
+    push di
+    int 0x12
+    mov di, memory_buffer
+    call word_to_decimal_string
+    pop di
+    pop ax
+    ret
+
+build_kernel_sectors_string:
+    push ax
+    push di
+    xor ax, ax
+    mov al, [kernel_sectors]
+    mov di, kernel_sector_buffer
+    call word_to_decimal_string
+    pop di
+    pop ax
+    ret
+
+build_boot_drive_string:
+    push ax
+    push di
+    mov al, [boot_drive]
+    mov di, boot_drive_buffer
+    call byte_to_hex_string
+    pop di
+    pop ax
+    ret
+
+build_uptime_string:
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+
+    call get_elapsed_ticks
+    jc .fallback
+    mov bx, 18
+    call divide_dword_by_word
+    mov dx, cx
+    mov di, uptime_buffer
+    call dword_to_decimal_string
+    jmp .done
+
+.fallback:
+    mov si, unavailable_msg
+    mov di, uptime_buffer
+    push es
+    push ds
+    pop es
+    call copy_zero_string
+    pop es
+
+.done:
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+store_bcd_ascii:
+    push ax
+    mov ah, al
+    shr al, 4
+    and al, 0x0F
+    add al, '0'
+    stosb
+    mov al, ah
+    and al, 0x0F
+    add al, '0'
+    stosb
+    pop ax
+    ret
+
+copy_zero_string:
+    push ax
+.loop:
+    lodsb
+    stosb
+    test al, al
+    jnz .loop
+    pop ax
+    ret
+
+word_to_decimal_string:
+    xor dx, dx
+    jmp dword_to_decimal_string
+
+dword_to_decimal_string:
+    push bx
+    push cx
+    push si
+    push es
+    mov [number_work_lo], ax
+    mov [number_work_hi], dx
+    mov si, decimal_buffer + 10
+    mov byte [si], 0
+
+    cmp dx, 0
+    jne .convert
+    cmp ax, 0
+    jne .convert
+    dec si
+    mov byte [si], '0'
+    jmp .copy
+
+.convert:
+.next_digit:
+    mov ax, [number_work_lo]
+    mov dx, [number_work_hi]
+    mov bx, 10
+    call divide_dword_by_word
+    mov [number_work_lo], ax
+    mov [number_work_hi], cx
+    add dl, '0'
+    dec si
+    mov [si], dl
+    cmp cx, 0
+    jne .next_digit
+    cmp ax, 0
+    jne .next_digit
+
+.copy:
+    push ds
+    pop es
+    call copy_zero_string
+    pop es
+    pop si
+    pop cx
+    pop bx
+    ret
+
+byte_to_hex_string:
+    push ax
+    push es
+    push ds
+    pop es
+    mov ah, al
+    shr al, 4
+    call nibble_to_hex_ascii
+    stosb
+    mov al, ah
+    and al, 0x0F
+    call nibble_to_hex_ascii
+    stosb
+    xor al, al
+    stosb
+    pop es
+    pop ax
+    ret
+
+nibble_to_hex_ascii:
+    and al, 0x0F
+    cmp al, 9
+    jbe .digit
+    add al, 'A' - 10
+    ret
+.digit:
+    add al, '0'
+    ret
+
+wait_key:
+    xor ah, ah
+    int 0x16
+    ret
+
+set_text_mode:
+    push ax
+    mov ax, 0x0003
+    int 0x10
+    pop ax
+    ret
+
+fill_rect:
+    push ax
+    push bx
+    push cx
+    push dx
+    push di
+
+    mov [rect_char], al
+    mov [rect_attr], bl
+    mov [rect_top], dh
+    mov [rect_left], dl
+    mov [rect_height], ch
+    mov [rect_width], cl
+
+    mov dh, [rect_top]
+    xor di, di
+    xor ax, ax
+    mov al, [rect_height]
+    mov di, ax
+
+.row_loop:
+    mov dl, [rect_left]
+    xor cx, cx
+    mov cl, [rect_width]
+
+.col_loop:
+    mov al, [rect_char]
+    mov bl, [rect_attr]
+    call put_char_at
+    inc dl
+    loop .col_loop
+
+    inc dh
+    dec di
+    jnz .row_loop
+
+    pop di
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+write_string_at:
+    push ax
+    push bx
+    push dx
+    push si
+
+.next_char:
+    lodsb
+    test al, al
+    jz .done
+    call put_char_at
+    inc dl
+    jmp .next_char
+
+.done:
+    pop si
+    pop dx
+    pop bx
+    pop ax
+    ret
+
+put_char_at:
+    push ax
+    push bx
+    push cx
+    push dx
+    push es
+    push di
+
+    cmp dh, 25
+    jae .done
+    cmp dl, 80
+    jae .done
+
+    mov ch, bl
+    mov cl, al
+
+    xor ax, ax
+    mov al, dh
+    mov di, ax
+    shl di, 6
+    shl ax, 4
+    add di, ax
+    xor ax, ax
+    mov al, dl
+    add di, ax
+    shl di, 1
+
+    mov ax, VIDEO_SEGMENT
+    mov es, ax
+    mov ax, cx
+    mov [es:di], ax
+
+.done:
+    pop di
+    pop es
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
 skip_spaces:
 .skip:
     cmp byte [si], ' '
@@ -482,6 +1849,9 @@ trim_input_buffer:
     push bx
     push si
     push di
+    push es
+    push ds
+    pop es
 
     mov si, input_buffer
     call skip_spaces
@@ -509,6 +1879,7 @@ trim_input_buffer:
     jmp .trim_tail
 
 .done:
+    pop es
     pop di
     pop si
     pop bx
@@ -578,6 +1949,9 @@ string_equals:
 
 copy_string:
     push ax
+    push es
+    push ds
+    pop es
 .loop:
     cmp cx, 1
     jne .room
@@ -590,6 +1964,7 @@ copy_string:
     test al, al
     jnz .loop
 .done:
+    pop es
     pop ax
     ret
 
@@ -633,11 +2008,7 @@ save_history:
     ret
 
 clear_screen:
-    push ax
-    mov ax, 0x0003
-    int 0x10
-    pop ax
-    ret
+    jmp set_text_mode
 
 print_banner:
     mov si, banner_msg
@@ -1001,26 +2372,27 @@ print_bcd_byte:
     popa
     ret
 
-banner_msg db "==============================", 13, 10
-           db " HeatOS 0.3  real-mode shell  ", 13, 10
-           db "==============================", 13, 10, 13, 10, 0
-boot_ready_msg db "Kernel ready with upgraded shell.", 13, 10, 0
-help_hint_msg db "Try: help, status, time, mem, history", 13, 10, 13, 10, 0
+banner_msg db "================================", 13, 10
+           db " HeatOS 0.4  desktop prototype ", 13, 10
+           db "================================", 13, 10, 13, 10, 0
+terminal_ready_msg db "Terminal opened from the desktop shell.", 13, 10, 0
+terminal_hint_msg db "Try: help, status, apps, desktop", 13, 10, 13, 10, 0
 prompt_msg db "Heat> ", 0
 unknown_msg db "Unknown command. Type 'help'.", 13, 10, 0
 help_msg db "Commands:", 13, 10
          db "  help      clear/cls   about       version/ver", 13, 10
          db "  echo      banner      beep        mem", 13, 10
          db "  date      time        uptime      boot", 13, 10
-         db "  status    history     repeat      halt/shutdown", 13, 10
+         db "  status    history     repeat      apps", 13, 10
+         db "  desktop   gui         halt/shutdown", 13, 10
          db "  reboot/restart", 13, 10
          db "Tip: press Esc while typing to clear the whole line.", 13, 10, 13, 10, 0
-about_msg db "HeatOS is a 16-bit educational OS with a BIOS-driven shell.", 13, 10
-          db "This build adds command history, RTC date/time, uptime,", 13, 10
-          db "memory and boot inspection, echo, banner, and wrappers", 13, 10
-          db "for easier launching on Windows.", 13, 10, 13, 10, 0
-version_msg db "HeatOS kernel v0.3", 13, 10
-            db "Features: history, repeat, rtc, mem, boot, status, echo.", 13, 10, 13, 10, 0
+about_msg db "HeatOS is still a BIOS-driven 16-bit real-mode OS,", 13, 10
+          db "but it now boots into a desktop-style workspace with", 13, 10
+          db "built-in apps, a terminal, system views, and a", 13, 10
+          db "keyboard-controlled launch surface.", 13, 10, 13, 10, 0
+version_msg db "HeatOS kernel v0.4", 13, 10
+            db "Features: desktop shell, apps, terminal, history, rtc.", 13, 10, 13, 10, 0
 echo_usage_msg db "Usage: echo <text>", 13, 10, 0
 date_prefix_msg db "Date: ", 0
 time_prefix_msg db "Time: ", 0
@@ -1029,7 +2401,7 @@ mem_prefix_msg db "Conventional memory: ", 0
 boot_prefix_msg db "Boot info: ", 0
 status_header_msg db "System status:", 13, 10, 0
 status_version_label db "  version: ", 0
-version_name_msg db "HeatOS kernel v0.3", 0
+version_name_msg db "HeatOS kernel v0.4", 0
 status_boot_label db "  boot:    ", 0
 status_mem_label db "  memory:  ", 0
 status_date_label db "  date:    ", 0
@@ -1039,12 +2411,21 @@ status_history_label db "  history: ", 0
 kb_suffix_msg db " KB", 0
 entries_suffix_msg db " stored", 0
 seconds_suffix_msg db " sec", 0
+seconds_suffix_inline_msg db "sec", 0
 unavailable_msg db "unavailable", 0
 history_header_msg db "Command history:", 13, 10, 0
 no_history_msg db "No history yet.", 13, 10, 0
 repeat_prefix_msg db "Replaying: ", 0
 no_repeat_msg db "Nothing to repeat yet.", 13, 10, 0
 beep_msg db "Beep sent.", 13, 10, 0
+apps_msg db "Desktop apps:", 13, 10
+         db "  terminal - command shell", 13, 10
+         db "  system   - live system summary", 13, 10
+         db "  files    - placeholder file browser", 13, 10
+         db "  notes    - roadmap and design notes", 13, 10
+         db "  clock    - RTC date/time view", 13, 10
+         db "  power    - halt or reboot", 13, 10, 13, 10, 0
+returning_to_desktop_msg db "Returning to the desktop...", 13, 10, 0
 halt_msg db "System halted.", 13, 10, 0
 reboot_msg db "Rebooting...", 13, 10, 0
 boot_summary_a db "Boot drive 0x", 0
@@ -1054,6 +2435,115 @@ boot_inline_a db "drive 0x", 0
 boot_inline_b db ", kernel ", 0
 boot_inline_c db " sectors / ", 0
 boot_inline_d db " bytes", 0
+
+desktop_top_title_msg db "HeatOS Desktop Environment", 0
+desktop_apps_header_msg db "Apps", 0
+desktop_workspace_header_msg db "Workspace", 0
+desktop_app_terminal_msg db "1  Terminal", 0
+desktop_app_system_msg db "2  System", 0
+desktop_app_files_msg db "3  Files", 0
+desktop_app_notes_msg db "4  Notes", 0
+desktop_app_clock_msg db "5  Clock", 0
+desktop_app_power_msg db "6  Power", 0
+desktop_footer_line1_msg db "Up/Down move  Enter launch  1-6 quick open  F1 help", 0
+desktop_footer_line2_msg db "T/S/F/N/C/P jump  Esc power  Desktop is keyboard-first for now", 0
+desktop_quick_header_msg db "Quick status", 0
+desktop_memory_label_msg db "Memory", 0
+desktop_kernel_label_msg db "Kernel sectors", 0
+desktop_boot_label_msg db "Boot drive", 0
+desktop_clock_label_msg db "Clock", 0
+desktop_launch_hint_msg db "Press Enter to launch the selected app.", 0
+desktop_kb_msg db "KB", 0
+
+preview_terminal_title_msg db "Terminal", 0
+preview_terminal_line1_msg db "Open the integrated shell for commands, status, history, and uptime.", 0
+preview_terminal_line2_msg db "Type 'desktop' from the shell to return here instantly.", 0
+preview_terminal_line3_msg db "This is the fastest path to inspect live kernel state.", 0
+preview_system_title_msg db "System", 0
+preview_system_line1_msg db "View core operating-system metrics and current runtime state.", 0
+preview_system_line2_msg db "The screen refreshes on demand and stays BIOS-only for now.", 0
+preview_system_line3_msg db "Good place to validate boot, memory, time, and uptime signals.", 0
+preview_files_title_msg db "Files", 0
+preview_files_line1_msg db "This is the starting point for a future ramdisk or tiny filesystem.", 0
+preview_files_line2_msg db "Right now it documents the planned layout instead of mounting disks.", 0
+preview_files_line3_msg db "Next step is making these paths real and writable.", 0
+preview_notes_title_msg db "Notes", 0
+preview_notes_line1_msg db "Roadmap and desktop design notes live here until storage exists.", 0
+preview_notes_line2_msg db "Use it as the design board for the next subsystems.", 0
+preview_notes_line3_msg db "Protected mode, interrupts, storage, and actual graphics come next.", 0
+preview_clock_title_msg db "Clock", 0
+preview_clock_line1_msg db "Shows RTC date/time plus uptime from BIOS timer ticks.", 0
+preview_clock_line2_msg db "Useful for checking that the kernel is keeping sane runtime state.", 0
+preview_clock_line3_msg db "Refresh the screen whenever you want a fresh timestamp.", 0
+preview_power_title_msg db "Power", 0
+preview_power_line1_msg db "Shut the machine down or reboot directly from the desktop.", 0
+preview_power_line2_msg db "This is still a BIOS reboot and CPU halt path, not ACPI power-off.", 0
+preview_power_line3_msg db "Use it when you want fast control without dropping into the shell.", 0
+
+app_system_title_msg db "HeatOS System Center", 0
+app_files_title_msg db "HeatOS Files", 0
+app_notes_title_msg db "HeatOS Notes", 0
+app_clock_title_msg db "HeatOS Clock", 0
+app_power_title_msg db "HeatOS Power", 0
+app_help_title_msg db "HeatOS Desktop Help", 0
+app_footer_line1_msg db "Esc desktop  Enter desktop  T terminal", 0
+app_footer_line2_msg db "Press R to refresh where it makes sense", 0
+
+system_heading_msg db "Live system summary", 0
+system_version_label_msg db "Kernel version", 0
+system_boot_label_msg db "Boot drive", 0
+system_kernel_label_msg db "Kernel sectors", 0
+system_memory_label_msg db "Conventional memory", 0
+system_date_label_msg db "RTC date", 0
+system_time_label_msg db "RTC time", 0
+system_uptime_label_msg db "Approx uptime", 0
+system_note_line1_msg db "This remains a single-task real-mode kernel with BIOS services.", 0
+system_note_line2_msg db "The desktop is text-mode, but the control flow now feels like an OS.", 0
+system_note_line3_msg db "Next major milestone is storage plus a real graphics pipeline.", 0
+
+files_heading_msg db "Virtual file layout", 0
+files_line1_msg db "/", 0
+files_line2_msg db "  apps/     built-in programs and launchers", 0
+files_line3_msg db "  docs/     notes, help, and system references", 0
+files_line4_msg db "  home/     future per-user space", 0
+files_line5_msg db "  system/   kernel data, drivers, and config", 0
+files_note_line1_msg db "No persistent filesystem is mounted yet.", 0
+files_note_line2_msg db "This screen is the contract for what the first ramdisk should expose.", 0
+files_note_line3_msg db "Once storage exists, the desktop can become more than a launcher.", 0
+
+notes_heading_msg db "Roadmap", 0
+notes_line1_msg db "1. Add a tiny ramdisk and path lookup.", 0
+notes_line2_msg db "2. Move keyboard and timer logic off direct BIOS polling.", 0
+notes_line3_msg db "3. Add a real graphics mode and window compositor.", 0
+notes_line4_msg db "4. Enter protected mode and build proper memory management.", 0
+notes_line5_msg db "5. Replace placeholders with actual apps and saved data.", 0
+notes_footer_line1_msg db "This screen is effectively the OS design notebook for now.", 0
+notes_footer_line2_msg db "The terminal command set is still the quickest way to inspect behavior.", 0
+
+clock_heading_msg db "Clock and uptime", 0
+clock_date_label_msg db "RTC date", 0
+clock_time_label_msg db "RTC time", 0
+clock_uptime_label_msg db "Approx uptime", 0
+clock_note_line1_msg db "Press R to redraw and fetch fresh BIOS clock values.", 0
+clock_note_line2_msg db "Current uptime is derived from the BIOS tick counter since boot.", 0
+
+power_heading_msg db "Power control", 0
+power_line1_msg db "H  Halt the CPU", 0
+power_line2_msg db "R  Reboot through BIOS", 0
+power_line3_msg db "T  Open terminal instead", 0
+power_line4_msg db "Esc or Enter returns to the desktop", 0
+power_line5_msg db "This is an early OS control panel, not an ACPI shutdown path.", 0
+power_line6_msg db "It is enough to control the VM cleanly while the platform grows.", 0
+
+help_heading_msg db "Desktop controls", 0
+help_line1_msg db "Up/Down moves between apps in the launcher rail.", 0
+help_line2_msg db "Enter launches the selected app.", 0
+help_line3_msg db "1-6 or T/S/F/N/C/P open apps directly.", 0
+help_line4_msg db "Esc from the home screen jumps to the power panel.", 0
+help_line5_msg db "T inside app screens opens the integrated terminal.", 0
+help_line6_msg db "Type 'desktop' or 'gui' in the terminal to come back.", 0
+help_line7_msg db "This is a starter desktop environment, not a full graphical stack yet.", 0
+help_line8_msg db "The next step is making apps persistent with a real filesystem.", 0
 
 cmd_help db "help", 0
 cmd_clear db "clear", 0
@@ -1072,6 +2562,9 @@ cmd_boot db "boot", 0
 cmd_status db "status", 0
 cmd_history db "history", 0
 cmd_repeat db "repeat", 0
+cmd_apps db "apps", 0
+cmd_desktop db "desktop", 0
+cmd_gui db "gui", 0
 cmd_halt db "halt", 0
 cmd_shutdown db "shutdown", 0
 cmd_reboot db "reboot", 0
@@ -1079,6 +2572,7 @@ cmd_restart db "restart", 0
 
 boot_drive db 0
 kernel_sectors db 0
+desktop_selection db 0
 history_next db 0
 history_used db 0
 boot_ticks_hi dw 0
@@ -1087,8 +2581,21 @@ args_ptr dw 0
 number_work_hi dw 0
 number_work_lo dw 0
 
+rect_char db 0
+rect_attr db 0
+rect_top db 0
+rect_left db 0
+rect_height db 0
+rect_width db 0
+
 input_buffer times HISTORY_ENTRY_SIZE db 0
 command_buffer times COMMAND_MAX + 1 db 0
 last_runnable_buffer times HISTORY_ENTRY_SIZE db 0
 history_buffer times HISTORY_COUNT * HISTORY_ENTRY_SIZE db 0
 decimal_buffer times 11 db 0
+date_buffer times 12 db 0
+time_buffer times 12 db 0
+memory_buffer times 8 db 0
+kernel_sector_buffer times 8 db 0
+boot_drive_buffer times 4 db 0
+uptime_buffer times 12 db 0

@@ -4,7 +4,17 @@
 
 A tiny educational operating system project with a **custom kernel** and bootloader, written in x86 assembly.
 
-This now boots into a much more capable kernel shell with commands like:
+It now boots into a **desktop-style text-mode environment** with built-in apps and an integrated terminal.
+
+Desktop apps:
+- `Terminal`
+- `System`
+- `Files`
+- `Notes`
+- `Clock`
+- `Power`
+
+Terminal commands:
 - `help`
 - `clear` / `cls`
 - `about`
@@ -18,6 +28,8 @@ This now boots into a much more capable kernel shell with commands like:
 - `status`
 - `history`
 - `repeat`
+- `apps`
+- `desktop` / `gui`
 - `banner`
 - `beep`
 - `halt` / `shutdown`
@@ -28,7 +40,7 @@ No Visual Studio 2022 is required.
 ## What This Project Contains
 
 - `src/boot/boot.asm`: 512-byte boot sector that loads your kernel.
-- `src/kernel/kernel.asm`: your custom kernel entry + expanded shell.
+- `src/kernel/kernel.asm`: your custom kernel entry, desktop shell, and terminal.
 - `scripts/build.ps1`: assembles and creates a bootable floppy image.
 - `scripts/run.ps1`: builds (unless `-SkipBuild`) and runs in QEMU.
 - `build.cmd` / `run.cmd`: Windows wrappers that bypass PowerShell execution-policy issues.
@@ -89,20 +101,21 @@ If you already built once and only want to run:
 .\scripts\run.ps1 -SkipBuild
 ```
 
-## Using The Kernel Shell
+## Using HeatOS
 
-When QEMU starts, you should see a prompt like:
+When QEMU starts, you should see a desktop heading like:
 
 ```text
-Heat>
+HeatOS Desktop Environment
 ```
 
 Try:
-- `help` for available commands
-- `status` for a system snapshot
-- `time` and `date` for RTC info
-- `history` and `repeat` for command recall
-- `echo hello world` to test argument handling
+- Use `Up` / `Down` to move between desktop apps.
+- Press `Enter` to launch the selected app.
+- Press `1` through `6` for quick launch.
+- Press `F1` for desktop help.
+- Open `Terminal`, then use `desktop` to return to the desktop.
+- In the terminal, try `status`, `apps`, `history`, and `uptime`.
 
 ## Troubleshooting
 
@@ -119,13 +132,15 @@ Try:
 ## Project Notes
 
 - This is a real-mode (16-bit) educational kernel, intentionally minimal.
+- The desktop environment is an early text-mode desktop shell, not a full graphical compositor yet.
 - The build script auto-calculates how many sectors to load for the current kernel size.
 - The current size limit is 128 sectors (64 KiB), controlled in `scripts/build.ps1` by `maxKernelSectors`.
 - The bootloader now reads across floppy tracks instead of assuming the kernel fits on the first one.
 
 ## Next Steps To Evolve HeatOS
 
-- Add a tiny file system or ramdisk.
+- Add a tiny file system or ramdisk so the Files app becomes real.
+- Move the desktop from text mode to a proper graphics mode.
 - Move from real mode to protected mode.
 - Replace floppy image flow with an ISO + GRUB boot path.
 - Add interrupt-driven keyboard and timer handling.
