@@ -6,9 +6,9 @@ A tiny educational operating system project with a **custom kernel** and bootloa
 
 The project now separates concerns more clearly:
 - **Kernel layer**: hardware-level services (boot/runtime state, PCI scan, timing, memory stats).
-- **OS layer**: the **Popeye** desktop environment plus terminal apps/commands.
+- **OS layer**: the **Popeye Plasma-style** desktop environment plus terminal apps/commands.
 
-It now boots into a **desktop-style text-mode environment** with built-in apps and an integrated terminal.
+It now boots **directly to desktop** into a Plasma-like text-mode shell with built-in apps and an integrated terminal.
 
 Desktop apps:
 - `Terminal`
@@ -37,7 +37,7 @@ Terminal commands:
 - `ping <host>` (loopback implemented)
 - `arch`
 - `apps`
-- `desktop` / `gui` / `popeye`
+- `desktop` / `gui` / `popeye` / `plasma`
 - `banner`
 - `beep`
 - `halt` / `shutdown`
@@ -128,16 +128,19 @@ Boot as ISO (if `build\Heatos.iso` exists):
 When QEMU starts, you should see a desktop heading like:
 
 ```text
-Popeye Desktop Environment
+Popeye Plasma Desktop
 ```
 
 Try:
 - Use `Up` / `Down` to move between desktop apps.
 - Press `Enter` to launch the selected app.
 - Press `1` through `7` for quick launch.
+- Press `M` for the kickoff-style app menu.
+- Press `R` for the run dialog (`terminal`, `system`, `files`, etc.).
+- Press `F2` for an instant terminal.
 - Use mouse click on app rows when mouse services are available.
 - Press `F1` for desktop help.
-- Open `Terminal`, then use `desktop` / `gui` / `popeye` to return to desktop.
+- Open `Terminal`, then use `desktop` / `gui` / `popeye` / `plasma` to return to desktop.
 - In terminal, try `status`, `net`, `ping 127.0.0.1`, and `arch`.
 
 ## Troubleshooting
