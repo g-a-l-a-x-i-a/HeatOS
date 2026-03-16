@@ -1,114 +1,78 @@
-# HeatOS, OS made only using VSC agent.
+﻿# HeatOS
 
-### yes even the README is ai :D
+REMEMBER HEATOS IS FULLY MADE BY ARTIFICIAL INTELLIGENCE
 
-A tiny educational operating system project with a **custom kernel** and bootloader, written in x86 assembly — now with a **fully modular source structure**.
+HeatOS is an educational 32-bit x86 operating system focused on low-level systems programming with a modern C-first kernel codebase.
 
-The codebase is split into focused source files:
+## Overview
 
-| Layer | Files |
-|---|---|
-| **Boot** | `src/boot/boot.asm` |
-| **Kernel entry** | `src/kernel/kernel.asm` (thin — only constants + `start:` + includes) |
-| **Drivers** | `src/drivers/mouse.asm`, `pci_net.asm` |
-| **Library** | `src/lib/video.asm`, `string.asm`, `input.asm`, `print.asm`, `math.asm`, `time.asm` |
-| **Terminal** | `src/terminal/terminal.asm`, `commands.asm` |
-| **Data** | `src/data/strings.asm`, `variables.asm` |
+- Boots from a floppy image in QEMU.
+- Uses a protected-mode kernel with a text console shell.
+- Implements real packet networking (not mocked output).
+- Prioritizes clear architecture and incremental feature growth.
 
-The project separates concerns clearly:
-- **Kernel layer**: hardware-level services (boot, PCI, timing, memory, mouse, video primitives).
-- **Terminal layer** (`src/terminal/`): `Heat>` shell and command set, separate from everything else.
+## Architecture
 
-> **Note:** The desktop environment has been removed and will be rewritten as a standalone assembly program.
+Boot flow:
+1. [src/boot/boot.asm](src/boot/boot.asm): BIOS boot sector, disk load, A20, GDT, protected-mode jump.
+2. [src/kernel/entry.asm](src/kernel/entry.asm): 32-bit entry shim and IDT setup.
+3. [src/kernel/main.c](src/kernel/main.c): kernel init and terminal handoff.
 
-It boots **directly to the terminal shell**.
+Runtime is mostly C:
+- [src/terminal/terminal.c](src/terminal/terminal.c)
+- [src/drivers/network.c](src/drivers/network.c)
+- [src/drivers/keyboard.c](src/drivers/keyboard.c)
+- [src/drivers/vga.c](src/drivers/vga.c)
+- [src/lib/ramdisk.c](src/lib/ramdisk.c)
+- [src/lib/string.c](src/lib/string.c)
 
-Terminal commands:
-- `help`
-- `clear` / `cls`
-- `about`
-- `version` / `ver`
-- `echo <text>`
-- `date`
-- `time`
-- `uptime`
-- `mem`
-- `boot`
-- `status`
-- `history`
-- `repeat`
-- `net`
-- `ping <host>` (loopback implemented)
-- `arch`
-- `apps`
-- `banner`
-- `beep`
-- `halt` / `shutdown`
-- `reboot` / `restart`
+Only required bootstrap assembly remains in active use.
 
-No Visual Studio 2022 is required.
+## Networking
 
-## What This Project Contains
+HeatOS networking currently includes:
+- PCI probing and init for QEMU `ne2k_pci`
+- Ethernet RX/TX path
+- ARP request/reply handling
+- IPv4 parsing
+- ICMP echo request/reply (`ping`)
+- UDP transport support for DNS queries
+- DNS A-record lookup for domain ping
 
-- `src/boot/boot.asm`: 512-byte boot sector that loads the kernel.
-- `src/kernel/kernel.asm`: **thin entry point** — constants, `start:`, and `%include` chain only.
-- `src/drivers/mouse.asm`: BIOS INT 0x33 mouse driver.
-- `src/drivers/pci_net.asm`: PCI bus scan for network adapters (class 0x02).
-- `src/lib/video.asm`: VGA text-mode helpers (`fill_rect`, `write_string_at`, `put_char_at`).
-- `src/lib/string.asm`: zero-terminated string utilities (copy, compare, parse).
-- `src/lib/input.asm`: keyboard polling, `read_line`, command history.
-- `src/lib/print.asm`: BIOS teletype output (`print_char`, `print_string`, `print_newline`).
-- `src/lib/math.asm`: decimal/hex conversion and formatted numeric printing.
-- `src/lib/time.asm`: RTC date/time, uptime (BIOS tick counter), string builders.
-- `src/terminal/terminal.asm`: `Heat>` shell session and command dispatch table.
-- `src/terminal/commands.asm`: all built-in command implementations.
-- `src/data/strings.asm`: zero-terminated string literals (last in binary).
-- `src/data/variables.asm`: mutable state and scratch buffers (last in binary).
-- `scripts/build.ps1`: assembles image, checks for C compiler, attempts ISO generation.
-- `scripts/run.ps1`: builds (unless `-SkipBuild`) and runs in QEMU (floppy or ISO).
-- `build.cmd` / `run.cmd`: Windows wrappers that bypass PowerShell execution-policy issues.
+This means `ping` supports both:
+- IPv4 targets (for example `1.1.1.1`)
+- Domain targets (for example `cloudflare.com`)
+
+## Terminal
+
+The built-in shell includes commands for:
+- System inspection (`status`, `mem`, `uptime`, `arch`)
+- Networking (`net`, `ping <ipv4|domain>`)
+- Filesystem operations (`ls`, `cd`, `pwd`, `mkdir`)
+- Session utilities (`help`, `clear`, `history`, `repeat`, `reboot`, `halt`)
+
+`ping` output uses a custom HeatOS net-probe style with:
+- Target and resolved address
+- Per-attempt pass/fail lines
+- Packet/loss summary
+- Through status (yes/no)
+- Final pass/partial/fail result
 
 ## Requirements (Windows)
 
-1. Windows 10/11
-2. PowerShell
-3. NASM assembler
-4. QEMU emulator
-5. Optional for ISO builds: `xorriso` / `mkisofs` / `genisoimage`
+1. NASM
+2. LLVM/Clang toolchain (`clang`, `ld.lld`, `llvm-objcopy`)
+3. QEMU
 
-Install dependencies with `winget`:
+Install with winget:
 
 ```powershell
 winget install --id NASM.NASM -e --accept-package-agreements --accept-source-agreements
+winget install --id LLVM.LLVM -e --accept-package-agreements --accept-source-agreements
 winget install --id SoftwareFreedomConservancy.QEMU -e --accept-package-agreements --accept-source-agreements
 ```
 
-After install, close and reopen your terminal.
-
-## Build and Run
-
-From the project root (`HeatOS`):
-
-Preferred on Windows if PowerShell scripts give you trouble:
-
-```bat
-run.cmd
-```
-
-PowerShell still works too:
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\run.ps1
-```
-
-That command will:
-1. Assemble `boot.asm` and `kernel.asm`
-2. Create `build\Heatos.img`
-3. Try to create `build\Heatos.iso` if an ISO tool is installed
-4. Boot the image in QEMU
-
-If you only want to build:
+## Build
 
 ```bat
 build.cmd
@@ -120,43 +84,34 @@ or
 .\scripts\build.ps1
 ```
 
-## Using HeatOS
+Build artifacts:
+- `build\boot.bin`
+- `build\kernel.bin`
+- `build\Heatos.img`
 
-When QEMU starts, you will see the `Heat>` terminal prompt.
+## Run
 
-Try:
-- Type `help` to see all available commands.
-- Use `status` to view system information.
-- Try `net` for network adapter info.
-- Try `ping 127.0.0.1` for loopback ping.
-- Use `arch` to see architecture details.
-- Use `halt` or `reboot` to control the system.
+```bat
+run.cmd
+```
 
-## Troubleshooting
+or
 
-- `NASM was not found`:
-  - Reopen terminal after installation.
-  - Verify with `nasm -v`.
-- `qemu-system-i386 was not found`:
-  - Reopen terminal after QEMU install.
-  - Verify with `qemu-system-i386 --version`.
-- Script execution blocked:
-  - Run `Set-ExecutionPolicy -Scope Process Bypass` in that terminal session.
-  - Or use `run.cmd` / `build.cmd`, which already launch PowerShell with `-ExecutionPolicy Bypass`.
+```powershell
+.\scripts\run.ps1
+```
 
-## Project Notes
+Default run path enables networking with:
+- `-nic user,model=ne2k_pci`
 
-- This is a real-mode (16-bit) educational kernel, intentionally minimal.
-- The desktop environment is being rewritten as a standalone assembly program.
-- QEMU run path now enables a NIC by default (`-nic user,model=ne2k_pci`) for network diagnostics.
-- The build script auto-calculates how many sectors to load for the current kernel size.
-- The current size limit is 128 sectors (64 KiB), controlled in `scripts/build.ps1` by `maxKernelSectors`.
-- The bootloader now reads across floppy tracks instead of assuming the kernel fits on the first one.
+## Quick Network Checks
 
-## Next Steps To Evolve HeatOS
+In the HeatOS terminal:
+1. `net`
+2. `ping 10.0.2.2`
+3. `ping 1.1.1.1`
+4. `ping cloudflare.com`
 
-- Write the new desktop environment as a standalone assembly program.
-- Add a tiny file system or ramdisk.
-- Move from real mode to protected mode.
-- Replace floppy image flow with an ISO + GRUB boot path.
-- Add interrupt-driven keyboard and timer handling.
+## Project Direction
+
+Current direction is practical kernel growth in C while keeping assembly minimal and limited to unavoidable bootstrapping responsibilities.

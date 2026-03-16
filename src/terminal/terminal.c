@@ -8,14 +8,15 @@
 #include "string.h"
 #include "io.h"
 #include "ramdisk.h"
+#include "network.h"
 
 /* -------------------------------------------------------------------------- */
 /* Color theme                                                                 */
 /* -------------------------------------------------------------------------- */
-#define TERM_NORMAL  VGA_ATTR(VGA_LIGHT_GRAY, VGA_BLACK)
-#define TERM_PROMPT  VGA_ATTR(VGA_LIGHT_GREEN, VGA_BLACK)
-#define TERM_BANNER  VGA_ATTR(VGA_CYAN,        VGA_BLACK)
-#define TERM_TITLE   VGA_ATTR(VGA_YELLOW,      VGA_BLACK)
+#define TERM_NORMAL  VGA_ATTR(VGA_WHITE,       VGA_BLACK)
+#define TERM_PROMPT  VGA_ATTR(VGA_WHITE,       VGA_BLACK)
+#define TERM_BANNER  VGA_ATTR(VGA_LIGHT_GRAY,  VGA_BLACK)
+#define TERM_TITLE   VGA_ATTR(VGA_WHITE,       VGA_BLACK)
 #define TERM_INPUT   VGA_ATTR(VGA_WHITE,       VGA_BLACK)
 
 /* -------------------------------------------------------------------------- */
@@ -101,6 +102,20 @@ static void print_pad2(int n) {
     print_dec((uint32_t)n);
 }
 
+static void print_ipv4(const uint8_t ip[4]) {
+    print_dec((uint32_t)ip[0]); term_putc('.', TERM_NORMAL);
+    print_dec((uint32_t)ip[1]); term_putc('.', TERM_NORMAL);
+    print_dec((uint32_t)ip[2]); term_putc('.', TERM_NORMAL);
+    print_dec((uint32_t)ip[3]);
+}
+
+static void print_mac(const uint8_t mac[6]) {
+    for (int i = 0; i < 6; i++) {
+        if (i) term_putc(':', TERM_NORMAL);
+        print_hex8(mac[i]);
+    }
+}
+
 /* ==========================================================================
  * History helpers
  * ========================================================================== */
@@ -142,7 +157,11 @@ static void readline(char *buf, int maxlen) {
     hw_cursor_sync();
 
     for (;;) {
-        int k = keyboard_wait();
+        int k = 0;
+        while (k == 0) {
+            network_poll();
+            k = keyboard_poll();
+        }
 
         if (k == KEY_ENTER) {
             buf[len] = '\0';
@@ -260,21 +279,14 @@ static void read_rtc(int *h, int *m, int *s, int *day, int *mon, int *year) {
     *year = c * 100 + y;
 }
 
-/* PCI config space read (bus 0) */
-static uint32_t pci_read(uint8_t slot, uint8_t reg) {
-    uint32_t addr = 0x80000000u | ((uint32_t)slot << 11) | (reg & 0xFCu);
-    outl(0xCF8, addr);
-    return inl(0xCFC);
-}
-
 /* ==========================================================================
  * Command implementations
  * ========================================================================== */
 
 static void banner(void) {
-    term_puts_attr("================================\n", TERM_BANNER);
-    term_puts_attr("        HeatOS 0.5              \n", TERM_BANNER);
-    term_puts_attr("================================\n\n", TERM_BANNER);
+    term_puts_attr("HeatOS Console\n", TERM_TITLE);
+    term_puts_attr("========================================\n", TERM_BANNER);
+    term_puts_attr("Network-aware shell in protected mode\n\n", TERM_BANNER);
 }
 
 static void cmd_help(void) {
@@ -284,7 +296,7 @@ static void cmd_help(void) {
     term_putln("  date      time        uptime      boot");
     term_putln("  status    history     repeat      apps");
     term_putln("  ls        cd          pwd         mkdir");
-    term_putln("  net       ping        arch");
+    term_putln("  net       ping <ipv4|domain>   arch");
     term_putln("  halt/shutdown  reboot/restart");
     term_putln("Tip: Up/Down arrows scroll history, Esc clears input.");
     term_putc('\n', TERM_NORMAL);
@@ -299,7 +311,7 @@ static void cmd_about(void) {
 
 static void cmd_version(void) {
     term_putln("HeatOS kernel v0.5");
-    term_putln("Features: terminal shell, PCI diagnostics, ramdisk filesystem.");
+    term_putln("Features: terminal shell, DNS+ICMP networking, ramdisk filesystem.");
     term_putc('\n', TERM_NORMAL);
 }
 
@@ -425,55 +437,169 @@ static void cmd_apps(void) {
     term_puts_attr("Terminal commands:\n", TERM_TITLE);
     term_putln("  help, clear, about, version, echo, banner, beep");
     term_putln("  date, time, uptime, mem, boot, status, history");
-    term_putln("  net, ping, arch, ls, cd, pwd, mkdir");
+    term_putln("  net, ping <ipv4|domain>, arch, ls, cd, pwd, mkdir");
     term_putln("  halt, shutdown, reboot, restart");
     term_putc('\n', TERM_NORMAL);
 }
 
 static void cmd_net(void) {
-    bool     found  = false;
-    uint8_t  slot   = 0;
-    uint16_t vendor = 0, device = 0;
-    uint8_t  cls = 0, sub = 0;
-
-    for (uint8_t s = 0; s < 32; s++) {
-        uint32_t id = pci_read(s, 0x00);
-        if ((id & 0xFFFFu) == 0xFFFFu) continue;
-        uint32_t cr = pci_read(s, 0x08);
-        cls = (uint8_t)(cr >> 24);
-        sub = (uint8_t)(cr >> 16);
-        if (cls == 0x02) {          /* Network controller */
-            found  = true;
-            slot   = s;
-            vendor = (uint16_t)(id & 0xFFFFu);
-            device = (uint16_t)(id >> 16);
-            break;
-        }
-    }
+    bool up = network_init();
+    net_info_t info;
+    network_get_info(&info);
 
     term_puts_attr("Network:\n", TERM_TITLE);
     term_puts("  state:   ");
-    if (found) {
-        term_putln("detected");
-        term_puts("  slot:    "); print_dec(slot);      term_putc('\n', TERM_NORMAL);
-        term_puts("  vendor:  "); print_hex16(vendor);  term_putc('\n', TERM_NORMAL);
-        term_puts("  device:  "); print_hex16(device);  term_putc('\n', TERM_NORMAL);
-        term_puts("  class:   "); print_hex8(cls);
-        term_putc('/', TERM_NORMAL); print_hex8(sub);   term_putc('\n', TERM_NORMAL);
-    } else {
+    if (!info.present) {
         term_putln("not detected");
+        term_putln("  hint:    run QEMU with -nic user,model=ne2k_pci");
+        term_putc('\n', TERM_NORMAL);
+        return;
+    }
+
+    term_putln((up && info.ready) ? "online" : "detected (init failed)");
+    term_puts("  slot:    "); print_dec((uint32_t)info.pci_slot); term_putc('\n', TERM_NORMAL);
+    term_puts("  vendor:  "); print_hex16(info.vendor_id);         term_putc('\n', TERM_NORMAL);
+    term_puts("  device:  "); print_hex16(info.device_id);         term_putc('\n', TERM_NORMAL);
+    term_puts("  io-base: 0x"); print_hex16(info.io_base);         term_putc('\n', TERM_NORMAL);
+
+    if (info.ready) {
+        term_puts("  mac:     "); print_mac(info.mac);          term_putc('\n', TERM_NORMAL);
+        term_puts("  ip:      "); print_ipv4(info.ip);          term_putc('\n', TERM_NORMAL);
+        term_puts("  gateway: "); print_ipv4(info.gateway);     term_putc('\n', TERM_NORMAL);
+        term_puts("  netmask: "); print_ipv4(info.netmask);     term_putc('\n', TERM_NORMAL);
+        term_putln("  dns:     10.0.2.3");
+    } else {
+        term_putln("  warning: NIC found but driver init failed");
     }
     term_putc('\n', TERM_NORMAL);
 }
 
 static void cmd_ping(const char *args) {
+    char target[96];
+    uint8_t ip[4];
+    uint8_t tmp_ip[4];
+    bool target_is_ipv4;
+    bool used_dns = false;
+    net_dns_result_t dns;
+    int sent = 0;
+    int received = 0;
+    uint32_t min_ms = 0;
+    uint32_t max_ms = 0;
+    uint32_t sum_ms = 0;
+
     while (*args == ' ') args++;
-    if (!*args) { term_putln("Usage: ping <address>"); return; }
-    if (strcmp(args, "127.0.0.1") == 0 || strcmp(args, "localhost") == 0) {
-        term_putln("PING 127.0.0.1: reply from 127.0.0.1, time=0ms");
-    } else {
-        term_puts("ping: "); term_puts(args); term_putln(" - no route (not implemented)");
+    if (!*args) { term_putln("Usage: ping <ipv4|domain>"); return; }
+
+    int n = 0;
+    while (args[n] && args[n] != ' ' && n < (int)sizeof(target) - 1) {
+        target[n] = args[n];
+        n++;
     }
+    target[n] = '\0';
+
+    target_is_ipv4 = network_parse_ipv4(target, tmp_ip);
+
+    if (!network_init()) {
+        term_putln("ping: network unavailable (no ne2k_pci adapter)");
+        return;
+    }
+
+    if (!network_dns_resolve_a(target, 700000u, ip, &dns)) {
+        term_puts_attr("Net Probe\n", TERM_TITLE);
+        term_puts_attr("----------------------------------------\n", TERM_BANNER);
+        term_puts("target : "); term_putln(target);
+        term_putln("resolve: failed");
+        term_putln("through: no");
+        term_putln("result : FAIL\n");
+        return;
+    }
+
+    used_dns = !target_is_ipv4 && strcmp(target, "localhost") != 0;
+
+    term_puts_attr("Net Probe\n", TERM_TITLE);
+    term_puts_attr("----------------------------------------\n", TERM_BANNER);
+    term_puts("target : "); term_putln(target);
+    term_puts("ip     : "); print_ipv4(ip); term_putc('\n', TERM_NORMAL);
+    if (used_dns) {
+        term_puts("resolve: ok (");
+        print_dec(dns.time_ms);
+        term_putln(" ms)");
+    } else {
+        term_putln("resolve: direct");
+    }
+    term_putc('\n', TERM_NORMAL);
+
+    for (int i = 0; i < 4; i++) {
+        net_ping_result_t res;
+        bool ok;
+        sent++;
+
+        ok = network_ping_ipv4(ip, 600000u, &res);
+
+        if (ok && res.success) {
+            uint32_t shown_ms = res.time_ms;
+            if (shown_ms == 0) shown_ms = 1;
+
+            received++;
+            if (received == 1 || shown_ms < min_ms) min_ms = shown_ms;
+            if (shown_ms > max_ms) max_ms = shown_ms;
+            sum_ms += shown_ms;
+
+            term_puts("[");
+            print_dec((uint32_t)(i + 1));
+            term_puts("] pass  ");
+            print_ipv4(ip);
+            term_puts("  rtt=");
+            print_dec(shown_ms);
+            term_puts("ms  ttl=");
+            print_dec((uint32_t)(res.ttl ? res.ttl : 64u));
+            term_puts("  bytes=");
+            print_dec((uint32_t)(res.bytes ? res.bytes : 32u));
+            term_putc('\n', TERM_NORMAL);
+        } else {
+            term_puts("[");
+            print_dec((uint32_t)(i + 1));
+            term_putln("] fail  timeout");
+        }
+    }
+
+    int lost = sent - received;
+    int loss_pct = sent ? (lost * 100) / sent : 0;
+
+    term_putc('\n', TERM_NORMAL);
+    term_puts("packets: sent=");
+    print_dec((uint32_t)sent);
+    term_puts(" recv=");
+    print_dec((uint32_t)received);
+    term_puts(" lost=");
+    print_dec((uint32_t)lost);
+    term_puts(" loss=");
+    print_dec((uint32_t)loss_pct);
+    term_putln("%");
+
+    term_puts("through: ");
+    term_putln(received > 0 ? "yes" : "no");
+
+    if (received > 0) {
+        term_puts("rtt    : min=");
+        print_dec(min_ms);
+        term_puts("ms avg=");
+        print_dec(sum_ms / (uint32_t)received);
+        term_puts("ms max=");
+        print_dec(max_ms);
+        term_putln("ms");
+    }
+
+    term_puts("result : ");
+    if (received == sent) {
+        term_putln("PASS");
+    } else if (received > 0) {
+        term_putln("PARTIAL");
+    } else {
+        term_putln("FAIL");
+    }
+
+    term_putc('\n', TERM_NORMAL);
 }
 
 static void cmd_ls(void) {
@@ -536,10 +662,10 @@ void terminal_run(void) {
     read_rtc(&boot_hour, &boot_min, &boot_sec, &dummy_day, &dummy_mon, &dummy_year);
 
     ramdisk_init();
+    (void)network_init();
     term_clear_screen();
     banner();
-    term_puts_attr("Terminal ready.\n", TERM_PROMPT);
-    term_puts("Try: help, net, ping 127.0.0.1\n\n");
+    term_puts_attr("Terminal ready.\n\n", TERM_PROMPT);
 
     static char input[INPUT_MAX + 1];
     static char cmd[CMD_MAX + 1];
@@ -549,9 +675,9 @@ void terminal_run(void) {
         /* Print prompt with cwd */
         char pwd_buf[64];
         fs_build_path(fs_cwd_get(), pwd_buf, sizeof(pwd_buf));
-        term_puts_attr("Heat", TERM_PROMPT);
+        term_puts_attr("heatos", TERM_PROMPT);
         term_puts_attr(pwd_buf, TERM_PROMPT);
-        term_puts_attr("> ", TERM_PROMPT);
+        term_puts_attr("$ ", TERM_PROMPT);
 
         readline(input, INPUT_MAX);
 
