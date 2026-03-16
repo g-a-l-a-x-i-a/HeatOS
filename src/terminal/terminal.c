@@ -13,7 +13,6 @@
 #include "popeye_plasma.h"
 #include "plasma_java.h"
 #include "mamu.h"
-#include "kat.h"
 #include "wget.h"
 
 /* -------------------------------------------------------------------------- */
@@ -582,8 +581,23 @@ static void cmd_mamu(const char *args) {
 
 static void cmd_kat(const char *args) {
     while (*args == ' ') args++;
-    term_hooks_t hooks = { term_putc, term_puts, term_putln };
-    kat_run(args, &hooks);
+    if (!*args) { term_putln("Usage: kat <file>"); return; }
+    
+    fs_node_t node = fs_resolve(args);
+    if (!node || !fs_is_file(node)) {
+        term_putln("kat: file not found");
+        return;
+    }
+
+    char buf[RAMDISK_DATA_CAP + 1];
+    int n = fs_read(node, buf, RAMDISK_DATA_CAP);
+    if (n >= 0) {
+        buf[n] = '\0';
+        term_puts(buf);
+        if (n > 0 && buf[n-1] != '\n') term_putc('\n', TERM_NORMAL);
+    } else {
+        term_putln("kat: error reading file");
+    }
 }
 
 static void cmd_wget(const char *args) {
