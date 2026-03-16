@@ -56,7 +56,7 @@ static void hw_cursor_sync(void) {
     outb(0x3D4, 0x0E); outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
 }
 
-void term_putc(char c, uint8_t attr) {
+static void term_putc(char c, uint8_t attr) {
     if (c == '\n') {
         cur_col = 0;
         cur_row++;
@@ -76,8 +76,8 @@ static void term_puts_attr(const char *s, uint8_t attr) {
     while (*s) term_putc(*s++, attr);
 }
 
-void term_puts(const char *s)   { term_puts_attr(s, TERM_NORMAL); }
-void term_putln(const char *s)  { term_puts(s); term_putc('\n', TERM_NORMAL); }
+static void term_puts(const char *s)   { term_puts_attr(s, TERM_NORMAL); }
+static void term_putln(const char *s)  { term_puts(s); term_putc('\n', TERM_NORMAL); }
 
 static void term_clear_screen(void) {
     vga_clear(TERM_NORMAL);
@@ -581,7 +581,8 @@ static void cmd_mamu(const char *args) {
 
 static void cmd_kat(const char *args) {
     while (*args == ' ') args++;
-    kat_run(args);
+    term_hooks_t hooks = { term_putc, term_puts, term_putln };
+    kat_run(args, &hooks);
 }
 
 static void cmd_apps(void) {
