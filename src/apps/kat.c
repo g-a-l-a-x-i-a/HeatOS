@@ -17,12 +17,24 @@ void kat_run(const char *filename, term_hooks_t *hooks) {
         return;
     }
 
-    char buf[512];
-    int n = fs_read(node, buf, sizeof(buf) - 1);
+    /* Read in chunks to handle files up to RAMDISK_DATA_CAP */
+    char buf[256];
+    int total_read = 0;
+    int n;
+    
+    /* 
+       Note: Our current fs_read implementation always returns the FULL file data 
+       starting from offset 0 (it doesn't track a seek pointer).
+       To be truly efficient for large files, we'd need a seek-aware fs_read.
+       For now, let's just read the whole thing in one go if it fits in a reasonable buffer.
+    */
+    
+    char large_buf[RAMDISK_DATA_CAP + 1];
+    n = fs_read(node, large_buf, RAMDISK_DATA_CAP);
     if (n >= 0) {
-        buf[n] = '\0';
-        hooks->puts(buf);
-        if (n > 0 && buf[n-1] != '\n') {
+        large_buf[n] = '\0';
+        hooks->puts(large_buf);
+        if (n > 0 && large_buf[n-1] != '\n') {
             hooks->putc('\n', VGA_ATTR(VGA_WHITE, VGA_BLACK));
         }
     } else {
