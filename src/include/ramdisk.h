@@ -26,10 +26,11 @@ void      fs_cwd_set(fs_node_t node);
 
 bool      fs_mkdir_child(fs_node_t parent, const char *name);
 
-bool      fs_list_begin(fs_node_t dir, fs_node_t *iter_out);
-bool      fs_list_next(fs_node_t *iter_in_out, fs_node_t *child_out);
+bool        fs_list_begin(fs_node_t dir, fs_node_t *iter_out);
+bool        fs_list_next(fs_node_t *iter_in_out, fs_node_t *child_out);
 
-void      fs_build_path(fs_node_t node, char *buf, size_t buf_size);
+void        fs_build_path(fs_node_t node, char *buf, size_t buf_size);
+const char *fs_get_name(fs_node_t node);
 
 #endif
 

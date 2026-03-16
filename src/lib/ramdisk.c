@@ -198,6 +198,11 @@ bool fs_list_next(fs_node_t *iter_in_out, fs_node_t *child_out) {
     return true;
 }
 
+const char *fs_get_name(fs_node_t node) {
+    if (node >= RAMDISK_MAX_NODES) return "";
+    return fs_node_name[node];
+}
+
 void fs_build_path(fs_node_t node, char *buf, size_t buf_size) {
     if (!buf || buf_size == 0) return;
 

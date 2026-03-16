@@ -99,6 +99,13 @@ if ($LASTEXITCODE -ne 0) { throw "NASM failed on entry.asm" }
 # ---- Step 2: Compile all C files ------------------------------------------
 $cFlags = @(
     "--target=i386-none-elf",
+    "-march=i386",
+    "-mno-mmx",
+    "-mno-sse",
+    "-mno-sse2",
+    "-msoft-float",
+    "-fno-vectorize",
+    "-fno-slp-vectorize",
     "-ffreestanding",
     "-nostdlib",
     "-fno-stack-protector",
