@@ -191,7 +191,7 @@ void catnake_run() {
             }
 
             for (uint32_t d = 0; d < delay_loops; d++) {
-                for (volatile uint32_t i = 0; i < 50000; i++) {
+                for (volatile uint32_t i = 0; i < 800000; i++) {
                     // Small busy wait
                 }
                 while ((k = keyboard_poll()) != 0) pending_input = k;
