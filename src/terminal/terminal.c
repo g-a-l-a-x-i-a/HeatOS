@@ -2,15 +2,20 @@
 #include "vga.h"
 #include "keyboard.h"
 #include "string.h"
-#include "ramdisk.h"
-#include "network.h"
-#include "mamu.h"
-#include "catnake.h"
-#include "kat.h"
 #include "commands.h"
 
 static int cursor_x = 0;
 static int cursor_y = 0;
+
+static void str_to_lower_in_place(char *s) {
+    if (!s) return;
+    while (*s) {
+        if (*s >= 'A' && *s <= 'Z') {
+            *s = (char)(*s - 'A' + 'a');
+        }
+        s++;
+    }
+}
 
 void term_putc(char c, uint8_t attr) {
     if (c == '\n') {
@@ -42,8 +47,15 @@ void term_puts(const char *s) {
     }
 }
 
-void terminal_run(void) {
+void term_reset_screen(void) {
     vga_clear(0x07);
+    cursor_x = 0;
+    cursor_y = 0;
+    vga_set_cursor(cursor_y, cursor_x);
+}
+
+void terminal_run(void) {
+    term_reset_screen();
     term_puts("Welcome to HeatOS!\n");
     term_puts("The whole kernel have been rewritten for stability.\n> ");
     
@@ -63,7 +75,10 @@ void terminal_run(void) {
                         *args = '\0';
                         args++;
                         while (*args == ' ') args++; // Skip multiple spaces
+                        if (*args == '\0') args = NULL;
                     }
+
+                    str_to_lower_in_place(cmdbuf);
 
                     if (strcmp(cmdbuf, "help") == 0) {
                         term_puts("Available commands:\n");
@@ -74,9 +89,7 @@ void terminal_run(void) {
                         term_puts("  Apps:    mamu kat\n");
                         term_puts("  UI:      help clear\n");
                     } else if (strcmp(cmdbuf, "clear") == 0) {
-                        vga_clear(0x07);
-                        cursor_x = 0; cursor_y = 0;
-                        vga_set_cursor(cursor_y, cursor_x);
+                        term_reset_screen();
                     } else if (cmd_dispatch(cmdbuf, args)) {
                         // Command found and handled.
                     } else {

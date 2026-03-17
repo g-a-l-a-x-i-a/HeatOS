@@ -9,7 +9,9 @@ typedef struct {
     void (*putln)(const char *s);
 } term_hooks_t;
 
+void term_putc(char c, uint8_t attr);
 void term_puts(const char *s);
+void term_reset_screen(void);
 void terminal_run(void);
 
 #endif

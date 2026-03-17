@@ -206,34 +206,39 @@ static void ramdisk_seed_demo_files(void) {
     }
 }
 
-fs_node_t fs_resolve(const char *path) {
-    if (!path || !*path)
-        return fs_cwd;
-
+bool fs_resolve_checked(const char *path, fs_node_t *out_node) {
     fs_node_t cur;
+    char token[RAMDISK_NAME_LEN];
+    const char *p;
 
-    if (*path == '/') {
-        cur = 0; 
-        path++;
-    } else {
-        cur = fs_cwd; 
+    if (!out_node) return false;
+
+    if (!path || !*path) {
+        *out_node = fs_cwd;
+        return true;
     }
 
-    char token[RAMDISK_NAME_LEN];
-    const char *p = path;
+    if (*path == '/') {
+        cur = 0;
+        path++;
+    } else {
+        cur = fs_cwd;
+    }
 
+    p = path;
     while (fs_next_token(&p, token)) {
         if (token[0] == '\0')
             break;
 
         if (strcmp(token, ".") == 0) {
+            /* stay */
         } else if (strcmp(token, "..") == 0) {
             if (cur != 0)
                 cur = fs_node_parent[cur];
         } else {
             fs_node_t child = fs_find_child(cur, token);
             if (!child)
-                return 0;
+                return false;
             cur = child;
         }
 
@@ -242,7 +247,16 @@ fs_node_t fs_resolve(const char *path) {
             break;
     }
 
-    return cur;
+    *out_node = cur;
+    return true;
+}
+
+fs_node_t fs_resolve(const char *path) {
+    fs_node_t out = 0;
+    if (!fs_resolve_checked(path, &out)) {
+        return 0;
+    }
+    return out;
 }
 
 bool fs_is_dir(fs_node_t node) {

@@ -48,6 +48,8 @@ void cmd_mamu(const char *args);
 void cmd_catnake(const char *args);
 void cmd_kat(const char *args);
 
+bool cmd_copy_file_path(const char *src_path, const char *dst_path, int *bytes_out);
+
 bool cmd_dispatch(const char *cmd, const char *args);
 
 #endif

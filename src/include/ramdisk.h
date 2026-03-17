@@ -18,6 +18,7 @@ typedef uint8_t fs_node_t;
 void ramdisk_init(void);
 
 fs_node_t fs_resolve(const char *path);
+bool      fs_resolve_checked(const char *path, fs_node_t *out_node);
 
 bool      fs_is_dir(fs_node_t node);
 bool      fs_is_file(fs_node_t node);

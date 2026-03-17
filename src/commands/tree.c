@@ -4,11 +4,11 @@
 static void tree_recursive(fs_node_t node, int depth) {
     fs_node_t iter;
     if (!fs_list_begin(node, &iter)) return;
-    
+
     fs_node_t child;
     while (fs_list_next(&iter, &child)) {
         for (int i = 0; i < depth; i++) term_puts("  ");
-        term_puts("\xE3\x94\x9c ");
+        term_puts("|- ");
         term_puts(fs_get_name(child));
         if (fs_is_dir(child)) {
             term_puts("/\n");

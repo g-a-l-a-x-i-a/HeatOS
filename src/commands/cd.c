@@ -2,28 +2,26 @@
 #include "ramdisk.h"
 
 void cmd_cd(const char *args) {
+    fs_node_t target;
+
     if (!args || !*args) {
-        // cd without args goes to root
-        fs_cwd_set(fs_resolve("/"));
-        term_puts("Changed to root\n");
+        fs_cwd_set(0);
         return;
     }
-    
-    fs_node_t target = fs_resolve(args);
-    if (target == 0) {
+
+    if (!fs_resolve_checked(args, &target)) {
         term_puts("cd: directory not found: ");
         term_puts(args);
         term_puts("\n");
         return;
     }
-    
+
     if (!fs_is_dir(target)) {
         term_puts("cd: not a directory: ");
         term_puts(args);
         term_puts("\n");
         return;
     }
-    
+
     fs_cwd_set(target);
-    term_puts("OK\n");
 }
