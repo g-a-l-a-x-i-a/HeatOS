@@ -3,9 +3,11 @@
 #include "keyboard.h"
 #include "string.h"
 #include "ramdisk.h"
+#include "network.h"
 #include "mamu.h"
 #include "catnake.h"
 #include "kat.h"
+#include "commands.h"
 
 static int cursor_x = 0;
 static int cursor_y = 0;
@@ -64,34 +66,19 @@ void terminal_run(void) {
                     }
 
                     if (strcmp(cmdbuf, "help") == 0) {
-                        term_puts("Available commands:\n  help        - Show this message\n  clear       - Clear screen\n  ls          - List files\n  mamu [file] - Open text editor\n  catnake     - Play snake game\n  kat [file]  - Display file content\n");
+                        term_puts("Available commands:\n");
+                        term_puts("  File:    ls mkdir rm touch cd pwd tree cp find grep rmdir mv\n");
+                        term_puts("  Network: ping wget nslookup ifconfig netstat traceroute curl telnet\n");
+                        term_puts("  System:  echo uname whoami date ps kill top reboot shutdown\n");
+                        term_puts("  Games:   catnake guess pong tetris\n");
+                        term_puts("  Apps:    mamu kat\n");
+                        term_puts("  UI:      help clear\n");
                     } else if (strcmp(cmdbuf, "clear") == 0) {
                         vga_clear(0x07);
                         cursor_x = 0; cursor_y = 0;
                         vga_set_cursor(cursor_y, cursor_x);
-                    } else if (strcmp(cmdbuf, "ls") == 0) {
-                        fs_node_t iter;
-                        if (fs_list_begin(fs_cwd_get(), &iter)) {
-                            fs_node_t child;
-                            while (fs_list_next(&iter, &child)) {
-                                term_puts(fs_get_name(child));
-                                if (fs_is_dir(child)) term_puts("/");
-                                term_puts("  ");
-                            }
-                            term_puts("\n");
-                        }
-                    } else if (strcmp(cmdbuf, "mamu") == 0) {
-                        mamu_run(args ? args : "");
-                        vga_clear(0x07);
-                        cursor_x = 0; cursor_y = 0;
-                        vga_set_cursor(cursor_y, cursor_x);
-                    } else if (strcmp(cmdbuf, "catnake") == 0) {
-                        catnake_run();
-                        vga_clear(0x07);
-                        cursor_x = 0; cursor_y = 0;
-                        vga_set_cursor(cursor_y, cursor_x);
-                    } else if (strcmp(cmdbuf, "kat") == 0) {
-                        kat_run(args);
+                    } else if (cmd_dispatch(cmdbuf, args)) {
+                        // Command found and handled.
                     } else {
                         term_puts("Unknown command: ");
                         term_puts(cmdbuf);
