@@ -9,6 +9,7 @@ typedef struct {
     void (*putln)(const char *s);
 } term_hooks_t;
 
+void term_puts(const char *s);
 void terminal_run(void);
 
 #endif

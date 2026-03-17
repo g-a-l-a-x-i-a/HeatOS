@@ -95,6 +95,13 @@ void *memmove(void *dst, const void *src, size_t n) {
     return dst;
 }
 
+char *strchr(const char *s, int c) {
+    while (*s != (char)c) {
+        if (!*s++) return NULL;
+    }
+    return (char *)s;
+}
+
 void itoa(int value, char *buf, int base) {
     char tmp[34];
     int i = 0;
