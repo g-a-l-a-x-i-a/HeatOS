@@ -1,5 +1,6 @@
 #include "vga.h"
 #include "string.h"
+#include "io.h"
 
 static volatile uint16_t *const VGA = (volatile uint16_t *)VGA_ADDRESS;
 
@@ -50,4 +51,12 @@ void vga_scroll_up(int top, int bottom, uint8_t attr) {
     uint16_t blank = (uint16_t)' ' | ((uint16_t)attr << 8);
     for (int c = 0; c < VGA_WIDTH; c++)
         VGA[(bottom - 1) * VGA_WIDTH + c] = blank;
+}
+
+void vga_set_cursor(int row, int col) {
+    uint16_t pos = row * VGA_WIDTH + col;
+    outb(0x3D4, 0x0F);
+    outb(0x3D5, (uint8_t)(pos & 0xFF));
+    outb(0x3D4, 0x0E);
+    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
 }

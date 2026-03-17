@@ -49,7 +49,8 @@ void vga_fill_rect(int row, int col, int h, int w, char c, uint8_t attr);
 void vga_fill_row(int row, char c, uint8_t attr);
 uint16_t vga_read_at(int row, int col);
 
-/* Scrolling terminal support */
+/* Cursor and scrolling support */
+void vga_set_cursor(int row, int col);
 void vga_scroll_up(int top, int bottom, uint8_t attr);
 
 #endif

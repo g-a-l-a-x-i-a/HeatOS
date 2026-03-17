@@ -1,26 +1,25 @@
-/*=============================================================================
- * HeatOS Kernel Main
- * 32-bit Protected Mode entry point, called from entry.asm
- *===========================================================================*/
 #include "vga.h"
 #include "keyboard.h"
-#include "mouse.h"
-#include "ramdisk.h"
 #include "terminal.h"
-#include "popeye_plasma.h"
+#include "types.h"
 
+void gdt_init(void); void idt_init(void);
+void pmm_init(uint32_t);
+void scheduler_init(void);
+void fat32_init(void);
+void net_stack_init(void);
+void web_stack_init(void);
 void kernel_main(void) {
+    gdt_init();
+    idt_init();
+    pmm_init(0x4000000); // 64MB memory
+    scheduler_init();
+    fat32_init();
+    net_stack_init();
+    web_stack_init();
     vga_init();
     keyboard_init();
-    if (mouse_init()) {
-        mouse_set_reporting(false);
-    }
-    ramdisk_init();
-    popeye_plasma_init();
-
-    /* Always boot to terminal. Desktop is launched via 'popeye boot plasma'. */
     terminal_run();
-
     for (;;)
         __asm__ volatile("hlt");
 }

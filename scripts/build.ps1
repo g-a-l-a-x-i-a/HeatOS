@@ -92,9 +92,13 @@ Write-Host "=== HeatOS Build (C/C++ + ASM, 32-bit Protected Mode) ===" -Foregrou
 Write-Host ""
 
 # ---- Step 1: Assemble kernel entry (ELF32 object) -------------------------
-Write-Host "  [ASM] entry.asm" -ForegroundColor Yellow
+Write-Host "  [ASM] entry.asm, gdt_flush.asm, idt_flush.asm" -ForegroundColor Yellow
 $entryObj = Join-Path $buildDir "entry.o"
+    $gdtFlushObj = Join-Path $buildDir "gdt_flush.o"
+    $idtFlushObj = Join-Path $buildDir "idt_flush.o"
 $null = & $nasmPath -f elf32 $entrySource -o $entryObj 2>&1
+    $null = & $nasmPath -f elf32 "src/kernel/gdt_flush.asm" -o $gdtFlushObj 2>&1
+    $null = & $nasmPath -f elf32 "src/kernel/idt_flush.asm" -o $idtFlushObj 2>&1
 if ($LASTEXITCODE -ne 0) { throw "NASM failed on entry.asm" }
 
 # ---- Step 2: Compile all C files ------------------------------------------
@@ -146,7 +150,7 @@ $cppFlags = @(
     "c++"
 )
 
-$objFiles = @($entryObj)
+$objFiles = @($entryObj, $gdtFlushObj, $idtFlushObj)
 
 foreach ($cs in $cSources) {
     $objName = [System.IO.Path]::GetFileNameWithoutExtension($cs.Name) + ".o"

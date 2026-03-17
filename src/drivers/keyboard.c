@@ -1,5 +1,5 @@
 #include "keyboard.h"
-#include "mouse.h"
+
 #include "io.h"
 
 #define KB_DATA_PORT   0x60
@@ -55,7 +55,7 @@ bool keyboard_has_key(void) {
             return false;
 
         if (status & KB_STATUS_AUX) {
-            while (mouse_poll(0)) {}
+            inb(0x60);
             continue;
         }
 
@@ -71,7 +71,7 @@ int keyboard_poll(void) {
 
         /* Keep mouse packets flowing so AUX bytes never block keyboard input. */
         if (status & KB_STATUS_AUX) {
-            while (mouse_poll(0)) {}
+            inb(0x60);
             continue;
         }
 
