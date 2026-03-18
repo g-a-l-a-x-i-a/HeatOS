@@ -194,6 +194,7 @@ void terminal_run(void) {
                     term_puts("  Network: ping wget nslookup ifconfig netstat traceroute curl telnet\n");
                     term_puts("  System:  echo uname whoami date ps kill top dmesg kstats reboot shutdown\n");
                     term_puts("  System+: uptime sleep calc beep history\n");
+                    term_puts("  Java:    java [file]  jarinfo [file]  /java\n");
                     term_puts("  Games:   catnake pong\n");
                     term_puts("  Apps:    mamu kat desktop\n");
                     term_puts("  Tips:    echo > file  |  Up/Down=history  |  Home/End=line ends\n");

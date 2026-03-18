@@ -47,9 +47,19 @@ _start:
     mov [pdpt_table], eax
     mov dword [pdpt_table + 4], 0
 
-    ; PDE: present + writable + 2 MiB page (PS)
-    mov dword [pd_table], 0x00000083
-    mov dword [pd_table + 4], 0x00000000
+    ; Fill PD with 512 identity-mapped 2 MiB pages (maps first 1 GiB).
+    mov edi, pd_table
+    xor ebx, ebx
+    mov ecx, 512
+.map_2m_loop:
+    mov eax, ebx
+    or eax, 0x83               ; present + writable + PS
+    mov [edi], eax
+    mov dword [edi + 4], 0
+    add ebx, 0x200000
+    add edi, 8
+    dec ecx
+    jnz .map_2m_loop
 
     ; Load CR3 with PML4 physical address.
     mov eax, pml4_table

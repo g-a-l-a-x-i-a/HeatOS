@@ -1,10 +1,14 @@
 #include "fat32.h"
+#include "ramdisk.h"
 #include "string.h"
 #include "terminal.h"
 
 void fat32_init(void) {
-    // Stub definition for FAT32 init parsing BPB
-    // terminal_puts("FAT32 initialized.\n");
+    /*
+     * Current storage backend is ramdisk. Keep this entry point so commands
+     * can stay storage-agnostic while FAT32 disk plumbing is expanded.
+     */
+    ramdisk_init();
 }
 
 int fat32_read_file(const char* filename, void* buffer, uint32_t* size) {

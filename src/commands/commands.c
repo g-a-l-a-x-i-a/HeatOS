@@ -44,6 +44,9 @@ static const cmd_entry_t g_commands[] = {
     {"sleep",   "sleep N milliseconds",        cmd_sleep},
     {"calc",    "evaluate integer expression", cmd_calc},
     {"beep",    "play PC speaker tone",        cmd_beep},
+    {"java",    "run TinyJVM/HJAR app",        cmd_java},
+    {"jarinfo", "inspect JAR/ZIP contents",     cmd_jarinfo},
+    {"/java",   "jump to /java directory",      cmd_java_dir},
 };
 
 bool cmd_dispatch(const char *cmd, const char *args) {

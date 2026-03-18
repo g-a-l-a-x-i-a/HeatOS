@@ -91,7 +91,12 @@ if (-not (Test-Path $objcopyPath)) { throw "llvm-objcopy not found in $llvmBinDi
 
 # ---- Collect C/C++ source files -------------------------------------------
 if ($is64) {
-    $cSources = @((Get-Item (Join-Path $srcDir "kernel\main64.c")))
+    $cSources = @(
+        (Get-Item (Join-Path $srcDir "kernel\main64.c")),
+        (Get-Item (Join-Path $srcDir "lib\string.c")),
+        (Get-Item (Join-Path $srcDir "lib\ramdisk.c")),
+        (Get-Item (Join-Path $srcDir "drivers\serial.c"))
+    )
     $cppSources = @()
 } else {
     $cSources = Get-ChildItem -Recurse -Filter "*.c" -Path $srcDir | Where-Object { $_.Name -ne "main64.c" }

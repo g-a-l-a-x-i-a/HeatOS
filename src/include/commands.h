@@ -52,6 +52,9 @@ void cmd_uptime(const char *args);
 void cmd_sleep(const char *args);
 void cmd_calc(const char *args);
 void cmd_beep(const char *args);
+void cmd_java(const char *args);
+void cmd_jarinfo(const char *args);
+void cmd_java_dir(const char *args);
 void cmd_kat(const char *args);
 
 bool cmd_copy_file_path(const char *src_path, const char *dst_path, int *bytes_out);
